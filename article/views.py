@@ -3,26 +3,17 @@ from typing import Literal
 from bs4 import BeautifulSoup
 import requests
 from django.views.decorators.csrf import csrf_exempt
-from djapy import Schema, djapify, SessionAuth
+from djapy import djapify, SessionAuth
 from djapy.pagination import paginate, OffsetLimitPagination
 from djapy.schema import payload
+from openai import OpenAI
 from pydantic import HttpUrl
-from typing_extensions import TypedDict
 
+import env
 from .models import Article
+from .schema import ArticleSchema, MessageOut
 
-
-class ArticleSchema(Schema):
-    html_content: str
-    plain_text: str
-    url: str
-    title: str
-
-
-class MessageOut(TypedDict):
-    alias: str
-    message: str
-    message_type: Literal['error', 'info', 'success', 'warning']
+client = OpenAI(api_key=env.OPEN_AI_API_KEY, organization=env.OPEN_AI_ORG)
 
 
 @djapify(allowed_method="POST", auth=SessionAuth)

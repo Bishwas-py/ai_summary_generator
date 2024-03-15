@@ -51,28 +51,29 @@ def all_articles(request, **kwargs) -> {200: list[ArticleSchema]}:
 @djapify(allowed_method="POST", auth=SessionAuth)
 @csrf_exempt
 def make_summary(request, article_id: int,
-                 max_tokens: conint(ge=200, le=1200) = 300) -> {200: ArticleSchema, 400: MessageOut}:
+                 max_tokens: conint(ge=200, le=1200) = 300) -> {200: ArticleSchema, 400: MessageOut, 403: MessageOut}:
     try:
         article = Article.objects.get(id=article_id)
-        completion = client.chat.completions.create(
-            model="gpt-3.5-turbo", max_tokens=max_tokens,
-            messages=[
-                {"role": "system", "content": "You are a highly skilled professional on writing summaries. "
-                                              "Write a summary for the article below."},
-                {"role": "user", "content": article.plain_text}
-            ])
-        article.summary = completion.choices[0].message.content
-        article.save()
-        return article
     except Article.DoesNotExist:
         return 400, {
             'alias': 'article_not_found',
             'message': "The article with the given ID does not exist.",
             'message_type': 'error'
         }
-    except Exception as e:
-        return 400, {
-            'alias': 'summary_error',
-            'message': "An error occurred while trying to generate the summary. Please try again later.",
+    if article.user != request.user:
+        return 403, {
+            'alias': 'article_not_found',
+            'message': "You are not allowed to access this article.",
             'message_type': 'error'
         }
+
+    completion = client.chat.completions.create(
+        model="gpt-3.5-turbo", max_tokens=max_tokens,
+        messages=[
+            {"role": "system", "content": "You are a highly skilled professional on writing summaries. "
+                                          "Write a summary for the article below."},
+            {"role": "user", "content": article.plain_text}
+        ])
+    article.summary = completion.choices[0].message.content
+    article.save()
+    return article
